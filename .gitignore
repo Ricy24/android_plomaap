@@ -1,0 +1,39 @@
+# Flutter
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+*.iml
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/**/build/
+
+# Android Native
+android_native/.gradle/
+android_native/**/build/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+# Backups y temporales
+android_backup_old/
+doc_temp/
+proyecto_temp/
+*.zip
+
+# Android local
+android_native/local.properties
