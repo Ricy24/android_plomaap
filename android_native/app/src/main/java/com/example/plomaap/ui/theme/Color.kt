@@ -16,10 +16,16 @@ val BackgroundLight = Color(0xFFF7F9FC) // Very light gray-blue
 val SurfaceLight = Color(0xFFFFFFFF) // Pure white cards
 val SurfaceElevatedLight = Color(0xFFF0F4F8) // Slightly elevated
 
+// Semantic Aliases
+val PrimaryBlue = SapphireBlue
+val SurfaceWhite = SurfaceLight
+val ForestGreen = JadeGreen
+
 // Text
 val TextPrimary = Color(0xFF1C2B41) // Dark charcoal blue
 val TextSecondary = Color(0xFF5B6C83) // Slate gray
-val TextTertiary = Color(0xFF8F9FB3) // Light slate
+// Kept dark enough to be legible on white cards and in small supporting labels.
+val TextTertiary = Color(0xFF65758B) // Accessible slate
 val TextOnPrimary = Color(0xFFFFFFFF) // White on buttons
 
 // Status Colors
@@ -40,6 +46,7 @@ val ShimmerBase = Color(0xFFE2E8F0)
 val ShimmerHighlight = Color(0xFFF7F9FC)
 val ErrorRed = Color(0xFFFF5252)
 val StarGold = Color(0xFFFFD54F)
+val AmberWarning = Color(0xFFFFB300)
 val GoogleRed = Color(0xFFDB4437)
 val GlassWhite = Color(0x66FFFFFF) // Frosty glass
 val GlassBorder = Color(0x33000000) // Subtle border

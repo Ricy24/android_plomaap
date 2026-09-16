@@ -16,7 +16,9 @@ android/build/
 android/**/build/
 
 # Android Native
+# Android Native
 android_native/.gradle/
+android_native/.gradle-user/
 android_native/**/build/
 
 # IDE

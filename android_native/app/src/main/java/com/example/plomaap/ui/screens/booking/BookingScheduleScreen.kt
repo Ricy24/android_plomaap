@@ -1,17 +1,18 @@
 package com.example.plomaap.ui.screens.booking
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,96 +20,338 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.plomaap.data.model.TimeSlot
 import com.example.plomaap.ui.components.GradientButton
+import com.example.plomaap.ui.components.booking.BookingProgressStepper
 import com.example.plomaap.ui.theme.*
 import com.example.plomaap.viewmodel.BookingViewModel
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.text.SimpleDateFormat
+import java.util.*
+
+private data class QuickDate(
+    val isoDate: String,
+    val dayLabel: String,
+    val dateLabel: String,
+    val isToday: Boolean
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookingScheduleScreen(
     viewModel: BookingViewModel,
     onNavigateBack: () -> Unit,
-    onNavigateToLocation: () -> Unit
+    onNavigateToTechnician: () -> Unit
 ) {
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    var selectedTime by remember { mutableStateOf<String?>(null) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showDatePicker by remember { mutableStateOf(false) }
 
-    // Generate next 14 days
-    val dates = remember { (0..13).map { LocalDate.now().plusDays(it.toLong()) } }
-    
-    // Generate times (9 AM to 6 PM)
-    val times = remember {
-        listOf("09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00")
+    // Generate upcoming 7 days
+    val quickDates = remember {
+        val list = mutableListOf<QuickDate>()
+        val calendar = Calendar.getInstance()
+        val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dayNameFormat = SimpleDateFormat("EEE", Locale("es", "CO"))
+        val dayNumFormat = SimpleDateFormat("d MMM", Locale("es", "CO"))
+
+        for (i in 0 until 7) {
+            val d = calendar.time
+            val isToday = i == 0
+            val isTomorrow = i == 1
+            val dayLabel = when {
+                isToday -> "HOY"
+                isTomorrow -> "MAÑANA"
+                else -> dayNameFormat.format(d).uppercase()
+            }
+            list.add(
+                QuickDate(
+                    isoDate = isoFormat.format(d),
+                    dayLabel = dayLabel,
+                    dateLabel = dayNumFormat.format(d).uppercase(),
+                    isToday = isToday
+                )
+            )
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        list
+    }
+
+    // Auto-select first date if empty
+    LaunchedEffect(Unit) {
+        if (uiState.selectedDate.isBlank() && quickDates.isNotEmpty()) {
+            val firstDate = quickDates.first().isoDate
+            viewModel.selectDate(firstDate)
+        } else if (uiState.selectedDate.isNotBlank()) {
+            viewModel.loadAvailabilitySlots(uiState.selectedDate)
+        }
+    }
+
+    // Material 3 Date Picker Modal
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+                    cal.set(Calendar.HOUR_OF_DAY, 0)
+                    cal.set(Calendar.MINUTE, 0)
+                    cal.set(Calendar.SECOND, 0)
+                    cal.set(Calendar.MILLISECOND, 0)
+                    return utcTimeMillis >= cal.timeInMillis
+                }
+            }
+        )
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+                        cal.timeInMillis = millis
+                        val iso = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.time)
+                        viewModel.selectDate(iso)
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("Seleccionar", fontWeight = FontWeight.Bold, color = SapphireBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancelar", color = TextSecondary)
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 
     Scaffold(
         containerColor = BackgroundLight,
         topBar = {
             TopAppBar(
-                title = { Text("Fecha y Hora", fontWeight = FontWeight.Bold, color = TextPrimary) },
+                title = {
+                    Text(
+                        text = "Fecha y Horario",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, null) }
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver", tint = TextPrimary)
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundLight)
             )
         },
         bottomBar = {
-            Surface(color = SurfaceLight, shadowElevation = 24.dp, modifier = Modifier.fillMaxWidth()) {
-                PaddingValues(horizontal = 24.dp, vertical = 16.dp).let { padding ->
+            Surface(
+                color = SurfaceLight,
+                shadowElevation = 16.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 24.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Horario reservado",
+                            fontSize = 11.sp,
+                            color = TextTertiary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        val summaryText = if (uiState.selectedDate.isNotBlank() && uiState.selectedTime.isNotBlank()) {
+                            "${uiState.selectedDate} · ${uiState.selectedTime}"
+                        } else if (uiState.selectedDate.isNotBlank()) {
+                            "${uiState.selectedDate} · Elige hora"
+                        } else {
+                            "Selecciona horario"
+                        }
+                        Text(
+                            text = summaryText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (uiState.selectedTime.isNotBlank()) SapphireBlue else TextPrimary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
                     GradientButton(
-                        text = "Continuar",
-                        onClick = {
-                            if (selectedTime != null) {
-                                viewModel.selectDateTime(selectedDate.toString(), selectedTime!!)
-                                onNavigateToLocation()
-                            }
-                        },
-                        enabled = selectedTime != null,
-                        modifier = Modifier.padding(padding).fillMaxWidth()
+                        text = "Continuar a Técnico",
+                        onClick = onNavigateToTechnician,
+                        enabled = uiState.selectedDate.isNotBlank() && uiState.selectedTime.isNotBlank(),
+                        modifier = Modifier.width(180.dp)
                     )
                 }
             }
         }
     ) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text("Selecciona un día", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary, modifier = Modifier.padding(horizontal = 24.dp))
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(dates) { date ->
-                    DateCard(
-                        date = date,
-                        isSelected = date == selectedDate,
-                        onClick = { selectedDate = date; selectedTime = null }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
+            // Stepper: Paso 3
+            item {
+                BookingProgressStepper(currentStep = 3)
+            }
+
+            // Título de Fecha
+            item {
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    Text(
+                        text = "¿Cuándo necesitas el servicio?",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = TextPrimary
                     )
+                    Text(
+                        text = "Selecciona el día para verificar la disponibilidad de técnicos en tiempo real",
+                        fontSize = 12.sp,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+                    )
+
+                    // Carrusel de Días Cercanos
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(quickDates) { qd ->
+                            val isSelected = uiState.selectedDate == qd.isoDate
+                            DateChip(
+                                dayLabel = qd.dayLabel,
+                                dateLabel = qd.dateLabel,
+                                isSelected = isSelected,
+                                onClick = { viewModel.selectDate(qd.isoDate) }
+                            )
+                        }
+
+                        // Botón de más fechas
+                        item {
+                            OutlinedButton(
+                                onClick = { showDatePicker = true },
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.height(68.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SapphireBlue),
+                                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
+                                    brush = androidx.compose.ui.graphics.SolidColor(SapphireBlue.copy(alpha = 0.5f))
+                                )
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Rounded.CalendarMonth, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Text("Más fechas", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
-            Text("Selecciona la hora", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary, modifier = Modifier.padding(horizontal = 24.dp))
-            Spacer(modifier = Modifier.height(16.dp))
+            // Horarios disponibles
+            item {
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Horarios disponibles",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                items(times) { time ->
-                    TimeCard(
-                        time = time,
-                        isSelected = time == selectedTime,
-                        onClick = { selectedTime = time }
+                        if (uiState.isLoadingSlots) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = SapphireBlue)
+                        }
+                    }
+                    Text(
+                        text = "Calculados según la duración del servicio y disponibilidad de profesionales",
+                        fontSize = 12.sp,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 14.dp)
                     )
+
+                    if (uiState.isLoadingSlots) {
+                        // Slots skeleton
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            repeat(3) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(54.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(SurfaceElevatedLight)
+                                )
+                            }
+                        }
+                    } else if (uiState.availableSlots.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No hay horarios disponibles para la fecha seleccionada. Por favor elige otro día.",
+                                fontSize = 13.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    } else {
+                        // Group slots by period
+                        val morningSlots = uiState.availableSlots.filter { it.period == "morning" }
+                        val afternoonSlots = uiState.availableSlots.filter { it.period == "afternoon" }
+                        val eveningSlots = uiState.availableSlots.filter { it.period == "evening" }
+
+                        if (morningSlots.isNotEmpty()) {
+                            PeriodSection(
+                                icon = Icons.Rounded.WbSunny,
+                                title = "Mañana",
+                                slots = morningSlots,
+                                selectedTime = uiState.selectedTime,
+                                onSelectSlot = { viewModel.selectSlot(it) }
+                            )
+                        }
+
+                        if (afternoonSlots.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            PeriodSection(
+                                icon = Icons.Rounded.BrightnessMedium,
+                                title = "Tarde",
+                                slots = afternoonSlots,
+                                selectedTime = uiState.selectedTime,
+                                onSelectSlot = { viewModel.selectSlot(it) }
+                            )
+                        }
+
+                        if (eveningSlots.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            PeriodSection(
+                                icon = Icons.Rounded.NightsStay,
+                                title = "Noche",
+                                slots = eveningSlots,
+                                selectedTime = uiState.selectedTime,
+                                onSelectSlot = { viewModel.selectSlot(it) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -116,52 +359,143 @@ fun BookingScheduleScreen(
 }
 
 @Composable
-private fun DateCard(date: LocalDate, isSelected: Boolean, onClick: () -> Unit) {
-    val formatterDayOfWeek = DateTimeFormatter.ofPattern("EEE", Locale("es", "ES"))
-    val formatterDayOfMonth = DateTimeFormatter.ofPattern("dd")
-    val month = DateTimeFormatter.ofPattern("MMM", Locale("es", "ES")).format(date)
-
-    val bgColor = if (isSelected) SapphireBlue else SurfaceElevatedLight
-    val contentColor = if (isSelected) Color.White else TextPrimary
-    val borderColor = if (isSelected) SapphireBlue else DividerColor
-
-    Column(
+private fun DateChip(
+    dayLabel: String,
+    dateLabel: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
         modifier = Modifier
-            .width(70.dp)
-            .height(90.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
-            .clickable { onClick() }
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .width(76.dp)
+            .height(68.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) SapphireBlue else SurfaceLight)
+            .border(
+                width = if (isSelected) 1.5.dp else 1.dp,
+                color = if (isSelected) SapphireBlue else DividerColor,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
     ) {
-        val formattedDay = formatterDayOfWeek.format(date).take(3)
-        val capitalizedDay = formattedDay.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-        Text(capitalizedDay, fontSize = 13.sp, color = if (isSelected) Color.White.copy(alpha = 0.8f) else TextSecondary)
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(formatterDayOfMonth.format(date), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = contentColor)
-        val capitalizedMonth = month.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-        Text(capitalizedMonth, fontSize = 11.sp, color = if (isSelected) Color.White.copy(alpha = 0.8f) else TextTertiary)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = dayLabel,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (isSelected) Color.White else SapphireBlue
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = dateLabel,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isSelected) Color.White else TextPrimary
+            )
+        }
     }
 }
 
 @Composable
-private fun TimeCard(time: String, isSelected: Boolean, onClick: () -> Unit) {
-    val bgColor = if (isSelected) SapphireBlue.copy(alpha = 0.15f) else SurfaceLight
-    val textColor = if (isSelected) SapphireBlue else TextPrimary
-    val borderColor = if (isSelected) SapphireBlue else DividerColor
+private fun PeriodSection(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    slots: List<TimeSlot>,
+    selectedTime: String,
+    onSelectSlot: (TimeSlot) -> Unit
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(imageVector = icon, contentDescription = null, tint = SapphireBlue, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Grid of 3 columns
+        val chunked = slots.chunked(3)
+        chunked.forEach { rowSlots ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowSlots.forEach { slot ->
+                    val isSelected = selectedTime == slot.start
+                    Box(modifier = Modifier.weight(1f)) {
+                        SlotItem(
+                            slot = slot,
+                            isSelected = isSelected,
+                            onClick = { if (slot.available) onSelectSlot(slot) }
+                        )
+                    }
+                }
+                // Fill empty cells if row < 3
+                repeat(3 - rowSlots.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SlotItem(
+    slot: TimeSlot,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val isEnabled = slot.available
+
+    val bg = when {
+        isSelected -> SapphireBlue
+        !isEnabled -> SurfaceElevatedLight.copy(alpha = 0.6f)
+        else -> SurfaceLight
+    }
+
+    val textColor = when {
+        isSelected -> Color.White
+        !isEnabled -> TextTertiary.copy(alpha = 0.5f)
+        else -> TextPrimary
+    }
+
+    val borderColor = when {
+        isSelected -> SapphireBlue
+        !isEnabled -> Color.Transparent
+        else -> DividerColor
+    }
 
     Box(
         modifier = Modifier
-            .height(50.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
-            .clickable { onClick() },
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+            .clickable(enabled = isEnabled, onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 6.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(time, fontSize = 15.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, color = textColor, textAlign = TextAlign.Center)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = slot.start,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor
+            )
+            Text(
+                text = if (isEnabled) "Disponible" else "Ocupado",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = when {
+                    isSelected -> Color.White.copy(alpha = 0.85f)
+                    isEnabled -> JadeGreen
+                    else -> TextTertiary.copy(alpha = 0.6f)
+                }
+            )
+        }
     }
 }

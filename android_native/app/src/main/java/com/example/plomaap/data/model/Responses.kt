@@ -14,3 +14,13 @@ data class TechniciansResponse(
 data class AppointmentsResponse(
     val appointments: List<Appointment>
 )
+
+data class SlotsResponse(
+    val slots: List<String>
+)
+
+data class CreateAppointmentResponse(
+    val success: Boolean,
+    val message: String?,
+    val appointment: Appointment?
+)

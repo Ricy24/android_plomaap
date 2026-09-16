@@ -20,6 +20,7 @@ fun PremiumCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 24.dp,
     elevation: Dp = 16.dp,
+    contentPadding: Dp = 20.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(cornerRadius)
@@ -33,7 +34,7 @@ fun PremiumCard(
             )
             .clip(shape)
             .background(SurfaceLight)
-            .padding(24.dp),
+            .padding(contentPadding),
         content = content
     )
 }

@@ -26,7 +26,10 @@ import com.example.plomaap.ui.screens.appointments.AppointmentsScreen
 import com.example.plomaap.ui.screens.auth.ForgotPasswordScreen
 import com.example.plomaap.ui.screens.auth.LoginScreen
 import com.example.plomaap.ui.screens.auth.RegisterScreen
+import com.example.plomaap.ui.screens.auth.WelcomeScreen
 import com.example.plomaap.ui.screens.booking.*
+import com.example.plomaap.ui.screens.home.DigitalHomeScreen
+import com.example.plomaap.ui.screens.home.OnboardingScreen
 import com.example.plomaap.ui.screens.home.ServicesScreen
 import com.example.plomaap.ui.screens.profile.EditProfileScreen
 import com.example.plomaap.ui.screens.profile.ProfileScreen
@@ -37,15 +40,19 @@ import com.example.plomaap.viewmodel.BookingViewModel
 import com.example.plomaap.viewmodel.MainViewModel
 
 object Routes {
+    const val WELCOME = "welcome"
     const val LOGIN = "login"
     const val REGISTER = "register"
     const val FORGOT_PASSWORD = "forgot_password"
     const val MAIN = "main"
     const val EDIT_PROFILE = "edit_profile"
+    const val ONBOARDING = "onboarding"
+    const val DIGITAL_HOME = "digital_home"
     
     const val SERVICE_DETAILS = "service_details/{serviceId}"
     const val BOOKING_SCHEDULE = "booking_schedule"
     const val BOOKING_LOCATION = "booking_location"
+    const val BOOKING_TECHNICIAN = "booking_technician"
     const val BOOKING_SUMMARY = "booking_summary"
     
     fun serviceDetails(serviceId: Int) = "service_details/$serviceId"
@@ -73,20 +80,23 @@ fun AppNavigation(authViewModel: AuthViewModel) {
     }
 
     NavHost(
-        navController = navController, startDestination = if (authState.isLoggedIn) Routes.MAIN else Routes.LOGIN,
+        navController = navController, startDestination = if (authState.isLoggedIn) Routes.MAIN else Routes.WELCOME,
         enterTransition = { fadeIn(tween(300)) + slideInHorizontally(initialOffsetX = { 100 }, animationSpec = tween(300)) },
         exitTransition = { fadeOut(tween(200)) },
         popEnterTransition = { fadeIn(tween(300)) + slideInHorizontally(initialOffsetX = { -100 }, animationSpec = tween(300)) },
         popExitTransition = { fadeOut(tween(200)) + slideOutHorizontally(targetOffsetX = { 100 }, animationSpec = tween(200)) }
     ) {
         // Auth Flow
+        composable(Routes.WELCOME) { WelcomeScreen(navController) }
         composable(Routes.LOGIN) { LoginScreen(navController, authViewModel) }
         composable(Routes.REGISTER) { RegisterScreen(navController, authViewModel) }
         composable(Routes.FORGOT_PASSWORD) { 
             ForgotPasswordScreen(
                 isLoading = authState.isLoading, 
-                successMessage = authState.successMessage, 
+                successMessage = authState.successMessage,
+                errorMessage = authState.errorMessage,
                 onSendReset = { authViewModel.forgotPassword(it) }, 
+                onResetPassword = { email, token, newPass -> authViewModel.resetPassword(email, token, newPass) },
                 onNavigateBack = { navController.popBackStack() }, 
                 onClearMessages = { authViewModel.clearMessages() }
             ) 
@@ -106,6 +116,42 @@ fun AppNavigation(authViewModel: AuthViewModel) {
                 onClearMessages = { authViewModel.clearMessages() }
             ) 
         }
+
+        // Smart Onboarding (FASE 8)
+        composable(Routes.ONBOARDING) {
+            val mainViewModel: MainViewModel = viewModel()
+            val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+            OnboardingScreen(
+                questions = uiState.onboardingQuestions,
+                isLoading = uiState.isLoadingOnboarding,
+                isSubmitting = uiState.isLoadingOnboarding,
+                onComplete = { answers ->
+                    mainViewModel.submitOnboarding(answers) {
+                        navController.popBackStack()
+                    }
+                },
+                onSkip = {
+                    mainViewModel.skipOnboarding {
+                        navController.popBackStack()
+                    }
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // Mi Hogar Digital (FASE 7)
+        composable(Routes.DIGITAL_HOME) {
+            val mainViewModel: MainViewModel = viewModel()
+            val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+            DigitalHomeScreen(
+                homes = uiState.homes,
+                isLoading = uiState.isLoading,
+                onNavigateToOnboarding = {
+                    navController.navigate(Routes.ONBOARDING)
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
         
         // Booking Flow
         composable(
@@ -117,23 +163,31 @@ fun AppNavigation(authViewModel: AuthViewModel) {
                 serviceId = serviceId,
                 viewModel = bookingViewModel,
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToSchedule = { navController.navigate(Routes.BOOKING_SCHEDULE) }
-            )
-        }
-        
-        composable(Routes.BOOKING_SCHEDULE) {
-            BookingScheduleScreen(
-                viewModel = bookingViewModel,
-                onNavigateBack = { navController.popBackStack() },
                 onNavigateToLocation = { navController.navigate(Routes.BOOKING_LOCATION) }
             )
         }
         
         composable(Routes.BOOKING_LOCATION) {
             BookingLocationScreen(
+                navController = navController,
+                viewModel = bookingViewModel
+            )
+        }
+
+        composable(Routes.BOOKING_SCHEDULE) {
+            BookingScheduleScreen(
                 viewModel = bookingViewModel,
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToSummary = { navController.navigate(Routes.BOOKING_SUMMARY) }
+                onNavigateToTechnician = { navController.navigate(Routes.BOOKING_TECHNICIAN) }
+            )
+        }
+
+        composable(Routes.BOOKING_TECHNICIAN) {
+            BookingTechnicianScreen(
+                viewModel = bookingViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSummary = { navController.navigate(Routes.BOOKING_SUMMARY) },
+                onNavigateChangeDateTime = { navController.popBackStack(Routes.BOOKING_SCHEDULE, false) }
             )
         }
         
@@ -142,11 +196,29 @@ fun AppNavigation(authViewModel: AuthViewModel) {
                 userId = authState.user?.id,
                 viewModel = bookingViewModel,
                 onNavigateBack = { navController.popBackStack() },
-                onBookingSuccess = {
+                onViewAppointments = {
                     bookingViewModel.clearState()
                     navController.navigate(Routes.MAIN) {
                         popUpTo(Routes.MAIN) { inclusive = true }
                     }
+                },
+                onNavigateHome = {
+                    bookingViewModel.clearState()
+                    navController.navigate(Routes.MAIN) {
+                        popUpTo(Routes.MAIN) { inclusive = true }
+                    }
+                },
+                onNavigateChangeTechnician = {
+                    navController.popBackStack(Routes.BOOKING_TECHNICIAN, false)
+                },
+                onNavigateChangeService = {
+                    navController.popBackStack(Routes.SERVICE_DETAILS, false)
+                },
+                onNavigateChangeLocation = {
+                    navController.popBackStack(Routes.BOOKING_LOCATION, false)
+                },
+                onNavigateChangeSchedule = {
+                    navController.popBackStack(Routes.BOOKING_SCHEDULE, false)
                 }
             )
         }
@@ -160,9 +232,7 @@ fun MainScreen(navController: NavController, authViewModel: AuthViewModel, booki
     var selectedTab by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) { 
-        mainViewModel.loadServices() 
-        mainViewModel.loadAppointments(authState.user?.email ?: "")
-        mainViewModel.loadTechnicians() 
+        mainViewModel.loadHomeData()
     }
 
     Scaffold(
@@ -176,6 +246,16 @@ fun MainScreen(navController: NavController, authViewModel: AuthViewModel, booki
                         viewModel = mainViewModel,
                         onServiceClick = { serviceId ->
                             bookingViewModel.clearState()
+                            navController.navigate(Routes.serviceDetails(serviceId))
+                        },
+                        onNavigateToAppointments = { selectedTab = 1 },
+                        onNavigateToProfile = { selectedTab = 3 },
+                        onNavigateToOnboarding = { navController.navigate(Routes.ONBOARDING) },
+                        onNavigateToDigitalHome = { navController.navigate(Routes.DIGITAL_HOME) },
+                        onBookServiceWithNotes = { serviceId, notes ->
+                            bookingViewModel.clearState()
+                            bookingViewModel.selectService(serviceId)
+                            bookingViewModel.updateProblemDescription(notes)
                             navController.navigate(Routes.serviceDetails(serviceId))
                         }
                     )
