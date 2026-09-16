@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
     private const val PRIMARY_HOST = "127.0.0.1"       // USB ADB reverse
-    private const val WIFI_HOST = "192.168.29.110"    // Wi-Fi LAN IP
+    private const val WIFI_HOST = "10.1.193.174"      // Wi-Fi LAN IP
     private const val EMULATOR_HOST = "10.0.2.2"       // Android Emulator
     private const val PORT = 5000
 

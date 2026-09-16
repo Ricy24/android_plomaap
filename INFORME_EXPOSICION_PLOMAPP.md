@@ -1,202 +1,241 @@
-# Informe de exposicion - PlomApp
+# Informe de exposición - PlomApp Android Native
 
 ## 1. Datos generales
 
-**Proyecto:** PlomApp - aplicacion movil de servicios de plomeria y mantenimiento  
-**Cliente movil:** Flutter  
-**Backend:** API REST desarrollada con Flask  
-**Backend local:** `C:\Users\Anrid\plomaap_react_estable\backend_flask`  
-**Servidor esperado:** `http://localhost:5000` para navegador o `http://<IP-del-PC>:5000` para dispositivo movil.
+**Proyecto:** PlomApp  
+**Tipo de app:** Android Native con Kotlin + Jetpack Compose  
+**Backend:** Flask API REST  
+**Ruta del proyecto Android:** [android_native](android_native)  
+**Ruta del backend:** C:\Users\Anrid\plomaap_react_estable\backend_flask  
+**Puerto del backend:** http://127.0.0.1:5000 o http://<IP-del-PC>:5000
 
 ## 2. Objetivo del proyecto
 
-PlomApp conecta clientes que necesitan servicios de plomeria con tecnicos disponibles. El usuario puede autenticarse, seleccionar un rol, consultar servicios, revisar tecnicos, agendar citas, consultar sus solicitudes y actualizar su perfil. El backend centraliza la autenticacion, las reglas de negocio, la persistencia y el control de permisos.
+PlomApp es una aplicación móvil nativa para Android diseñada para conectar clientes con técnicos de plomería, además de ofrecer un flujo de autenticación, gestión de servicios, citas, perfil del usuario y administración de datos del hogar. La app nativa maneja la capa de presentación, navegación, validación de formularios y consumo de la API del backend.
 
-## 3. Resumen de cumplimiento
+## 3. Arquitectura general
 
-| Criterio | Evidencia encontrada | Estado para exponer |
-|---|---|---|
-| Codificacion completa y modulos funcionando | Login, registro, roles, servicios, tecnicos, citas, perfil y dashboard administrativo | Implementado en cliente y backend; demostrar flujo real |
-| Consumo real de API REST | `ApiService` usa HTTP contra Flask y envia JWT Bearer | Implementado; desactivar o identificar el fallback mock durante la prueba |
-| API REST documentada | README, `docs/QUICK_REFERENCE.md`, documentos de arquitectura y coleccion Postman | Documentada; no se encontro Swagger/OpenAPI visible |
-| Metodologia agil | El codigo no contiene backlog, historias, sprints o actas verificables | Preparar evidencia del proceso o presentarlo como proceso aplicado |
-| Control de versiones | Historial Git del backend, remoto `origin/main` y rama `main` | Evidencia parcial en movil; backend tiene historial mas completo |
+La solución está dividida en dos capas:
 
-## 4. Criterio VI: codificacion al 100%
+- Cliente Android nativo: desarrollado con Kotlin, Jetpack Compose, Navigation, ViewModel, Retrofit y DataStore.
+- Backend Flask: expone endpoints REST, autentica usuarios con JWT y gestiona la lógica de negocio, roles y persistencia.
 
-### 4.1 Autenticacion y usuarios
+La arquitectura de la app Android se puede observar en:
 
-La aplicacion movil contiene pantallas de inicio de sesion, registro y recuperacion de contrasena. El registro permite seleccionar el rol `customer` o `technician`.
+- [android_native/app/src/main/java/com/example/plomaap/data/api/ApiClient.kt](android_native/app/src/main/java/com/example/plomaap/data/api/ApiClient.kt)
+- [android_native/app/src/main/java/com/example/plomaap/data/api/ApiService.kt](android_native/app/src/main/java/com/example/plomaap/data/api/ApiService.kt)
+- [android_native/app/src/main/java/com/example/plomaap/data/repository/AuthRepository.kt](android_native/app/src/main/java/com/example/plomaap/data/repository/AuthRepository.kt)
+- [android_native/app/src/main/java/com/example/plomaap/viewmodel/AuthViewModel.kt](android_native/app/src/main/java/com/example/plomaap/viewmodel/AuthViewModel.kt)
+- [android_native/app/src/main/java/com/example/plomaap/ui/navigation/AppNavigation.kt](android_native/app/src/main/java/com/example/plomaap/ui/navigation/AppNavigation.kt)
 
-**Evidencia en el movil:**
+## 4. Tecnologías implementadas
 
-- `lib/screens/login_screen.dart`: formulario de autenticacion y navegacion al inicio.
-- `lib/screens/register_screen.dart`: alta de usuario con nombre, correo, contrasena, telefono, direccion y rol.
-- `lib/providers/auth_provider.dart`: administra token, sesion, perfil, logout y persistencia local.
-- `lib/services/api_service.dart`: llamadas a `/api/auth/login`, `/api/auth/register`, `/api/auth/profile` y recuperacion de contrasena.
-
-**Evidencia en Flask:**
-
-- `app/routes/auth.py`: endpoints de autenticacion y perfil.
-- JWT para proteger recursos y bcrypt para contrasenas.
-- El backend retorna usuario y token para que el cliente conserve la sesion.
-
-### 4.2 Servicios, tecnicos y citas
-
-La pantalla principal ofrece cuatro areas: servicios, mis citas, tecnicos y perfil.
-
-**Flujo que se puede demostrar:**
-
-1. Iniciar sesion.
-2. Consultar el catalogo de servicios.
-3. Abrir el detalle de un servicio.
-4. Crear una cita indicando fecha, hora y observaciones.
-5. Consultar las citas del usuario.
-6. Consultar tecnicos disponibles.
-7. Editar el perfil y cerrar sesion.
-
-**Endpoints principales:**
-
-| Modulo | Operaciones |
-|---|---|
-| Auth | `POST /api/auth/login`, `POST /api/auth/register`, `GET/PATCH /api/auth/profile` |
-| Servicios | `GET /api/services`, `GET /api/services/<id>` |
-| Tecnicos | `GET /api/technicians`, disponibilidad, horarios y citas del tecnico |
-| Citas | `GET/POST /api/appointments`, `GET/PATCH /api/appointments/<id>` |
-| Administracion | dashboard, usuarios y actualizacion de citas |
-| Salud | `GET /api/health` |
-
-Esto cubre operaciones de consulta y creacion en el flujo movil, y operaciones de actualizacion en perfil, citas y administracion. El backend tambien contiene rutas CRUD para hogares, habitaciones y activos en `app/routes/homes.py`.
-
-### 4.3 Reportes y administracion
-
-El backend incluye `app/routes/admin.py` con el endpoint `GET /api/admin/dashboard`, ademas de gestion de usuarios y citas. En la exposicion debe mostrarse la respuesta del dashboard o una captura del panel administrativo, porque la aplicacion Flutter visible esta enfocada principalmente en el flujo de cliente.
-
-### 4.4 Roles y permisos
-
-El sistema contempla los roles `customer`, `technician` y `admin`. Los decoradores y validaciones JWT restringen las operaciones segun el rol. En el modulo de hogares, por ejemplo, el propietario y el administrador pueden modificar, mientras que un miembro puede consultar sin modificar.
-
-**Demostracion recomendada:**
-
-- Entrar como cliente y crear una cita.
-- Entrar como tecnico y mostrar sus citas o disponibilidad.
-- Entrar como administrador y mostrar dashboard, usuarios o actualizacion de una cita.
-- Intentar una operacion no permitida y mostrar el `403 Forbidden`.
-
-## 5. Criterio VI: consumo real de API REST en movil
-
-El cliente Flutter utiliza el paquete `http` y centraliza las solicitudes en `lib/services/api_service.dart`. La URL se define segun la plataforma:
-
-- Web: `http://localhost:5000`.
-- Android, iOS o Windows: IP del equipo que ejecuta Flask en el puerto `5000`.
-
-Las solicitudes protegidas envian el encabezado:
-
-```text
-Authorization: Bearer <jwt>
-```
-
-### Prueba tecnica para la exposicion
-
-1. Activar el entorno virtual del backend:
-
-```powershell
-cd C:\Users\Anrid\plomaap_react_estable\backend_flask
-.\venv\Scripts\Activate.ps1
-python run.py
-```
-
-2. Comprobar salud del servidor:
-
-```powershell
-Invoke-RestMethod http://localhost:5000/api/health
-```
-
-3. Ejecutar la app Flutter desde `C:\Users\Anrid\Documents\plomaap`.
-
-4. Abrir las herramientas de red o los logs del backend y mostrar las peticiones a `/api/auth`, `/api/services` y `/api/appointments`.
-
-### Observacion importante
-
-`ApiService` contiene respuestas mock para cuando Flask no esta disponible. Esto permite que la interfaz no se bloquee, pero para cumplir el requisito de consumo real hay que mantener Flask encendido, usar una IP accesible desde el dispositivo y mostrar la respuesta proveniente del servidor. En la defensa se debe declarar que el mock es solo respaldo de desarrollo, no la evidencia principal.
-
-## 6. Criterio VI: API REST documentada
-
-El backend tiene documentacion en:
-
-- `README.md`: instalacion, arquitectura, caracteristicas y endpoints principales.
-- `docs/QUICK_REFERENCE.md`: modelos, autenticacion, endpoints, validaciones y respuestas.
-- `docs/STRUCTURE.md`: organizacion del backend.
-- `docs/BACKEND_DESIGN.md`: especificacion tecnica.
-- `docs/ARCHITECTURE_FLOWS.md`: flujos de arquitectura.
-- `postman_collection_plomapp_backend.json`: coleccion utilizable para probar la API.
-
-**Resultado:** la API esta documentada mediante Markdown y Postman. No se encontro una interfaz Swagger ni un archivo OpenAPI en los artefactos revisados. Si el evaluador exige literalmente Swagger, el pendiente es agregar una especificacion OpenAPI o integrar Flask-Smorest/Flasgger y presentar su URL.
-
-## 7. Criterio VI: metodologia agil
-
-El producto presenta funcionalidades que pueden organizarse como historias de usuario:
-
-| Historia | Criterio de aceptacion |
-|---|---|
-| Como cliente quiero iniciar sesion | El backend valida credenciales y devuelve JWT |
-| Como cliente quiero consultar servicios | La app muestra datos obtenidos desde `/api/services` |
-| Como cliente quiero agendar una cita | El backend crea la cita y la app la muestra en mis solicitudes |
-| Como tecnico quiero consultar mis citas | Solo el tecnico autenticado accede a su agenda |
-| Como administrador quiero revisar el estado | El dashboard retorna indicadores y usuarios/citas |
-
-### Guion de sprints para explicar el proceso
-
-- **Sprint 1:** estructura del proyecto, autenticacion y registro.
-- **Sprint 2:** catalogo de servicios y tecnicos.
-- **Sprint 3:** agenda, citas y perfiles.
-- **Sprint 4:** roles, dashboard, validaciones, pruebas y documentacion.
-
-Para que este criterio quede plenamente demostrable, anexar el tablero usado por el equipo con backlog, historias, responsables, estados, fechas y capturas de cada sprint. En los archivos revisados no se encontro un tablero o acta agil verificable, por lo que no conviene afirmar que existe esa evidencia si no se presenta aparte.
-
-## 8. Criterio VI: control de versiones
+### Cliente Android Native
+- Kotlin
+- Jetpack Compose
+- ViewModel
+- StateFlow
+- Navigation Compose
+- Retrofit + OkHttp
+- Gson
+- DataStore Preferences
+- Credential Manager para Google Sign-In y Passkeys
 
 ### Backend
+- Flask
+- Flask JWT Extended
+- SQLAlchemy
+- REST API modular
+- Roles y permisos
+- Endpoints para auth, servicios, técnicos, citas, administración y hogar digital
 
-El repositorio del backend tiene historial de commits, rama `main` y remoto `origin/main`. Algunos commits visibles son:
+## 5. Evidencias del funcionamiento en Android
 
-- `c5ec3cb` - Complemento de dashboard admin.
-- `2b354c5` - Correccion de emojis.
-- `adf1991` - Arreglo de versiones.
-- `013a5b2` - Actualizacion backend.
-- `20b270f` - Implementacion de backend Flask.
+### 5.1 Login y autenticación
+La pantalla de login está en [android_native/app/src/main/java/com/example/plomaap/ui/screens/auth/LoginScreen.kt](android_native/app/src/main/java/com/example/plomaap/ui/screens/auth/LoginScreen.kt). En ella se implementan:
 
-### Aplicacion movil
+- inicio de sesión con correo y contraseña
+- Google Sign-In
+- Passkey / biometría
+- validación de email y contraseña
+- manejo de errores y mensajes visibles al usuario
 
-El repositorio Flutter tiene la rama `main` y el commit inicial `db8985e` - Primer commit de PlomApp. Para demostrar ramas en la entrega, se recomienda crear ramas de trabajo con nombres claros, por ejemplo `feature/autenticacion`, `feature/citas` y `docs/informe`, y fusionarlas mediante pull request o merge documentado. No se deben inventar capturas ni commits que no existan.
+La lógica de negocio se encuentra en [android_native/app/src/main/java/com/example/plomaap/viewmodel/AuthViewModel.kt](android_native/app/src/main/java/com/example/plomaap/viewmodel/AuthViewModel.kt), donde se procesa el estado de la sesión y se consume el repositorio de autenticación.
 
-### Comandos para mostrar la evidencia
+### 5.2 Registro de usuario
+El registro se realiza a través de la pantalla: [android_native/app/src/main/java/com/example/plomaap/ui/screens/auth/RegisterScreen.kt](android_native/app/src/main/java/com/example/plomaap/ui/screens/auth/RegisterScreen.kt). Permite:
 
-```powershell
-git log --oneline --decorate --graph --all
-git branch --all
-git remote -v
-git status
-```
+- nombre completo
+- correo
+- teléfono
+- contraseña
+- dirección
+- selección de rol: cliente o técnico
 
-Ejecutar estos comandos tanto en el movil como en el backend y capturar la terminal completa.
+Los datos se envían al backend en el endpoint de registro mediante la API definida en [android_native/app/src/main/java/com/example/plomaap/data/api/ApiService.kt](android_native/app/src/main/java/com/example/plomaap/data/api/ApiService.kt).
 
-## 9. Orden recomendado para la exposicion
+### 5.3 Servicios y catálogo
+La vista principal de servicios está en [android_native/app/src/main/java/com/example/plomaap/ui/screens/home/ServicesScreen.kt](android_native/app/src/main/java/com/example/plomaap/ui/screens/home/ServicesScreen.kt). Aquí se muestra:
 
-1. Presentar el problema y el objetivo de PlomApp.
-2. Mostrar la arquitectura: Flutter -> API Flask -> base de datos.
-3. Levantar Flask y comprobar `/api/health`.
-4. Ejecutar login y registro con roles.
-5. Consultar servicios y tecnicos desde el movil.
-6. Crear y consultar una cita.
-7. Mostrar el perfil y el cierre de sesion.
-8. Mostrar dashboard y permisos administrativos.
-9. Abrir la documentacion Markdown y la coleccion Postman.
-10. Mostrar Git: commits, rama, remoto y estado.
-11. Explicar el backlog y los sprints con el tablero agil anexado.
+- búsqueda de servicios
+- listado de categorías
+- diagnóstico inteligente con IA
+- navegación a detalles del servicio
+- direccionamiento a ubicación, horario y técnico
 
-## 10. Conclusiones
+La app consume endpoints como:
 
-PlomApp cuenta con una base funcional de cliente movil y una API Flask modular. Se evidencian autenticacion JWT, roles, catalogo de servicios, tecnicos, citas, perfil, administracion, pruebas de contrato y documentacion tecnica. La demostracion debe ejecutarse con el backend activo para probar consumo real y debe diferenciar las respuestas mock de las respuestas de Flask.
+- GET /api/services
+- GET /api/services/categories
+- GET /api/services/{id}
 
-Los dos puntos que requieren evidencia adicional para una evaluacion estricta son la interfaz Swagger/OpenAPI y el proceso agil documentado. Tambien es recomendable mostrar ramas de trabajo reales en el repositorio movil, ya que actualmente la evidencia visible se concentra en la rama `main`.
+### 5.4 Citas y reservas
+La app cuenta con flujo de reserva y calendario para crear citas. En la navegación principal y las pantallas de booking se manejan:
+
+- selección de servicio
+- ubicación del cliente
+- horario disponible
+- técnico disponible
+- resumen final
+
+Esto está organizado en:
+
+- [android_native/app/src/main/java/com/example/plomaap/ui/navigation/AppNavigation.kt](android_native/app/src/main/java/com/example/plomaap/ui/navigation/AppNavigation.kt)
+- [android_native/app/src/main/java/com/example/plomaap/viewmodel/BookingViewModel.kt](android_native/app/src/main/java/com/example/plomaap/viewmodel/BookingViewModel.kt)
+
+### 5.5 Perfil de usuario
+La pantalla de perfil se encuentra en [android_native/app/src/main/java/com/example/plomaap/ui/screens/profile/ProfileScreen.kt](android_native/app/src/main/java/com/example/plomaap/ui/screens/profile/ProfileScreen.kt). Permite:
+
+- visualizar información del usuario
+- ver correo, teléfono y dirección
+- cerrar sesión
+- editar perfil
+
+## 6. Conexión con el backend Flask
+
+La comunicación con el backend se centraliza en [android_native/app/src/main/java/com/example/plomaap/data/api/ApiClient.kt](android_native/app/src/main/java/com/example/plomaap/data/api/ApiClient.kt). El cliente usa Retrofit y un cliente OkHttp con:
+
+- timeout de conexión y lectura
+- logging de operaciones HTTP
+- fallback de IP para pruebas locales y red Wi‑Fi
+
+El cliente usa estas direcciones principales:
+
+- 127.0.0.1:5000 para pruebas con USB ADB reverse
+- 192.168.29.110:5000 para red Wi‑Fi local
+- 10.0.2.2:5000 para emuladores Android
+
+Esto es un punto importante para la exposición: la app no tiene una URL fija “mágica”; tiene una estrategia de resolución de red para que el móvil pueda conectarse al backend.
+
+## 7. Roles y permisos
+
+La app y el backend contemplan roles como:
+
+- cliente
+- técnico
+- administrador
+
+Estos roles se gestionan en el backend mediante JWT y validaciones de acceso. La app utiliza la sesión del usuario guardada localmente para identificar el usuario autenticado y decidir qué interfaz mostrar.
+
+La lógica de roles está presente en:
+
+- [android_native/app/src/main/java/com/example/plomaap/data/model/User.kt](android_native/app/src/main/java/com/example/plomaap/data/model/User.kt)
+- [android_native/app/src/main/java/com/example/plomaap/data/repository/AuthRepository.kt](android_native/app/src/main/java/com/example/plomaap/data/repository/AuthRepository.kt)
+- [android_native/app/src/main/java/com/example/plomaap/viewmodel/AuthViewModel.kt](android_native/app/src/main/java/com/example/plomaap/viewmodel/AuthViewModel.kt)
+
+## 8. Endpoints principales consumidos por Android
+
+La app consume varios endpoints del backend Flask:
+
+- POST /api/auth/login
+- POST /api/auth/google-login
+- POST /api/auth/register
+- POST /api/auth/forgot-password
+- POST /api/auth/reset-password
+- GET /api/auth/profile
+- PATCH /api/auth/profile
+- POST /api/auth/logout
+- GET /api/services
+- GET /api/services/{id}
+- GET /api/technicians
+- GET /api/technicians/available
+- GET /api/technicians/slots
+- GET /api/appointments
+- POST /api/appointments
+- GET /api/admin/dashboard
+- GET /api/health
+
+La firma exacta de estos endpoints se ve en [android_native/app/src/main/java/com/example/plomaap/data/api/ApiService.kt](android_native/app/src/main/java/com/example/plomaap/data/api/ApiService.kt).
+
+## 9. Datos locales y persistencia
+
+La app guarda la sesión en DataStore: 
+
+- token JWT
+- datos del usuario
+- estado biométrico
+
+Esto está en [android_native/app/src/main/java/com/example/plomaap/data/repository/AuthRepository.kt](android_native/app/src/main/java/com/example/plomaap/data/repository/AuthRepository.kt). Esto permite mantener una sesión activa y evitar que el usuario tenga que volver a iniciar sesión cada vez.
+
+## 10. Repositorio de la API y documentacion
+
+El backend Flask tiene documentación y archivos de referencia, entre ellos:
+
+- README.md
+- docs/QUICK_REFERENCE.md
+- docs/BACKEND_DESIGN.md
+- docs/ARCHITECTURE_FLOWS.md
+- postman_collection_plomapp_backend.json
+
+La documentación está en el backend, no en el proyecto Android. El proyecto Android sí consume la API y usa sus modelos, pero la infraestructura documentada está en el backend.
+
+## 11. Estado de Swagger/OpenAPI
+
+No se encontró evidencia de Swagger u OpenAPI en la estructura revisada del proyecto Android o del backend. Lo que sí existe es:
+
+- documentación Markdown
+- colección de Postman
+- rutas y pruebas del backend
+
+Por lo tanto, para una defensa estricta, conviene decirlo así: el backend está documentado, pero la especificación Swagger/OpenAPI no está implementada explícitamente como archivo visible.
+
+## 12. Metodología ágil
+
+La app Android presenta módulos claramente divididos por funcionalidad: autenticación, home, citas, perfil, técnicos y navegación. Eso permite estructurarlas como historias de usuario, por ejemplo:
+
+- Como cliente quiero iniciar sesión.
+- Como cliente quiero buscar servicios.
+- Como cliente quiero agendar una cita.
+- Como técnico quiero consultar mis citas.
+- Como administrador quiero revisar el dashboard.
+
+En la práctica, la app tiene un diseño compatible con metodología ágil, pero la evidencia documental de sprints, tablero o backlog no aparece como artefacto verificable en el código revisado.
+
+## 13. Control de versiones
+
+El repositorio del backend tiene historial Git y ramas visibles con commits, mientras que la app Android muestra un proyecto más activo con varias modificaciones recientes. En exposición, conviene mostrar:
+
+- git log --oneline
+- git branch --all
+- git status
+
+Esto permite evidenciar la evolución del proyecto y la trazabilidad del desarrollo.
+
+## 14. Orden recomendado para la exposición
+
+1. Presentar la idea del proyecto PlomApp.
+2. Explicar la arquitectura Android + Flask.
+3. Mostrar el flujo de login.
+4. Mostrar registro con roles.
+5. Mostrar catálogo de servicios.
+6. Mostrar selección de ubicación, horario y técnico.
+7. Mostrar creación de cita.
+8. Mostrar perfil, edición y cierre de sesión.
+9. Mostrar documentación del backend y endpoints principales.
+10. Mostrar Git y el historial de cambios.
+
+## 15. Conclusión
+
+El proyecto Android Native desarrollado en Kotlin y Compose es una aplicación funcional y bien estructurada para gestionar servicios de plomería. Tiene una arquitectura organizada, se conecta con un backend Flask via Retrofit, maneja sesiones con JWT, integra autenticación por correo, Google y Passkey, y presenta una experiencia completa de navegación, servicios, citas y perfil de usuario.
+
+La parte más sólida es la integración real con la API y la organización modular de la aplicación. Los puntos que requieren mayor cuidado en defensa son la documentación Swagger/OpenAPI y la evidencia formal de metodología ágil, si se exige un nivel de rigor más alto por parte del evaluador.

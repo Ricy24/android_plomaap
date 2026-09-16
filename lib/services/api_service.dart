@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 class ApiService {
   // IP de tu PC donde está ejecutándose Flask: http://10.222.253.110:5000
   // Esta dirección funciona para Teléfonos Físicos, Emuladores y Windows.
-  static String customIp = "10.222.253.110";
+  static String customIp = "10.1.193.174";
 
   static String get baseUrl {
     if (kIsWeb) {
